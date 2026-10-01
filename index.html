@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ledger — สมุดบัญชีส่วนตัว</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%F0%9F%93%92</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --ink:#1B2A2F; --paper:#F6F3EC; --paper-dim:#EFEAE0;
+  --green:#2F6F5E; --red:#B84A3E; --gold:#C79A3E; --sage:#7C8F89;
+  --line: rgba(27,42,47,0.18);
+  --bg: var(--paper); --fg: var(--ink); --panel:#FFFDF8;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12191B; --fg:#EDE7D9; --panel:#182225; --paper-dim:#1B2528;
+    --line: rgba(237,231,217,0.14); --sage:#8FA6A0;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12191B; --fg:#EDE7D9; --panel:#182225; --paper-dim:#1B2528;
+  --line: rgba(237,231,217,0.14); --sage:#8FA6A0;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:'Inter',sans-serif;font-size:15px;line-height:1.5;}
+h1,h2,.num{font-family:'Fraunces',serif;}
+.num{font-variant-numeric:tabular-nums;}
+.wrap{max-width:1040px;margin:0 auto;padding:28px 20px 60px;}
+/* ---- Auth ---- */
+#auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.auth-card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);padding:36px 32px;}
+.auth-card h1{font-size:28px;margin:0 0 4px;font-weight:600;}
+.auth-card p.sub{color:var(--sage);margin:0 0 24px;font-size:14px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:13px;color:var(--sage);margin-bottom:5px;}
+.field input,.field select{width:100%;padding:10px 12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font-family:inherit;font-size:14px;}
+.field input:focus,.field select:focus,button:focus-visible{outline:2px solid var(--green);outline-offset:1px;}
+.btn{display:inline-block;padding:11px 20px;background:var(--green);color:#fff;border:none;font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;}
+.btn:hover{background:#255a4c;}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line);}
+.btn.danger{background:transparent;color:var(--red);border:1px solid var(--red);padding:5px 10px;font-size:12px;}
+.switch-line{margin-top:18px;font-size:13px;color:var(--sage);}
+.switch-line a{color:var(--green);cursor:pointer;text-decoration:underline;}
+.err{color:var(--red);font-size:13px;margin:8px 0 0;min-height:16px;}
+/* ---- App ---- */
+#app{display:none;}
+header.top{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:24px;flex-wrap:wrap;gap:10px;}
+header.top h1{font-size:20px;margin:0;font-weight:600;}
+header.top .who{color:var(--sage);font-size:13px;}
+header.top .who a{color:var(--red);cursor:pointer;margin-left:10px;}
+.hero{display:flex;gap:32px;flex-wrap:wrap;align-items:flex-end;margin-bottom:32px;}
+.hero .balance-label{color:var(--sage);font-size:13px;margin-bottom:2px;}
+.hero .balance{font-size:52px;font-weight:600;}
+.hero .balance.neg{color:var(--red);}
+.hero .balance.pos{color:var(--green);}
+.mini-stats{display:flex;gap:24px;}
+.mini-stats div span{display:block;}
+.mini-stats .lbl{font-size:12px;color:var(--sage);}
+.mini-stats .val{font-size:20px;}
+.grid2{display:grid;grid-template-columns:1.1fr 1.4fr;gap:28px;margin-bottom:32px;}
+@media(max-width:760px){.grid2{grid-template-columns:1fr;}}
+.panel{background:var(--panel);border:1px solid var(--line);padding:22px;}
+.panel h2{font-size:16px;margin:0 0 16px;font-weight:600;}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.formgrid .full{grid-column:1/-1;}
+.toggle-type{display:flex;border:1px solid var(--line);margin-bottom:14px;}
+.toggle-type button{flex:1;padding:8px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--sage);cursor:pointer;}
+.toggle-type button.active.inc{background:var(--green);color:#fff;}
+.toggle-type button.active.exp{background:var(--red);color:#fff;}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-bottom:32px;}
+@media(max-width:760px){.charts{grid-template-columns:1fr;}}
+.chart-box{height:230px;position:relative;}
+.filters{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end;}
+.filters .field{margin-bottom:0;min-width:140px;flex:1;}
+table{width:100%;border-collapse:collapse;font-size:14px;}
+th{text-align:left;font-weight:500;color:var(--sage);font-size:12px;padding:8px 6px;border-bottom:1px solid var(--line);}
+td{padding:10px 6px;border-bottom:1px solid var(--line);}
+tr:last-child td{border-bottom:none;}
+td.amt{text-align:right;font-family:'Fraunces',serif;}
+td.amt.inc{color:var(--green);}
+td.amt.exp{color:var(--red);}
+.cat-tag{font-size:12px;color:var(--sage);}
+.row-actions{display:flex;gap:6px;justify-content:flex-end;}
+.icon-btn{background:none;border:none;color:var(--sage);cursor:pointer;font-size:13px;text-decoration:underline;padding:0;}
+.empty{color:var(--sage);font-size:14px;padding:20px 0;text-align:center;}
+.overflow-x{overflow-x:auto;}
+
+/* ---- Polish pass ---- */
+.brand{display:flex;align-items:center;gap:9px;}
+.brand svg{flex-shrink:0;}
+.hero-card{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--gold);padding:30px 32px;position:relative;overflow:hidden;box-shadow:0 10px 26px -20px rgba(0,0,0,0.4);}
+.hero-card::before{content:'';position:absolute;inset:0;background-image:repeating-linear-gradient(180deg, transparent 0 27px, var(--line) 27px 28px);opacity:0.3;pointer-events:none;}
+.hero-card>*{position:relative;}
+.asof{font-size:12px;color:var(--sage);border:1px solid var(--line);padding:3px 11px;display:inline-block;margin-bottom:16px;}
+.panel{box-shadow:0 10px 24px -20px rgba(0,0,0,0.4);border-top:3px solid var(--gold);transition:box-shadow .2s ease;}
+.panel:hover{box-shadow:0 12px 28px -18px rgba(0,0,0,0.45);}
+tr{transition:background .15s ease;}
+tr:hover td{background:var(--paper-dim);}
+.btn{transition:transform .12s ease, background .15s ease;}
+.btn:active{transform:translateY(1px);}
+.field input,.field select{transition:border-color .15s ease;}
+.field input:hover,.field select:hover{border-color:var(--sage);}
+@keyframes riseIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+#app.show{animation:riseIn .55s cubic-bezier(.2,.7,.3,1) both;}
+#auth{padding:24px;}
+.auth-shell{display:flex;width:100%;max-width:940px;min-height:560px;margin:auto;border:1px solid var(--line);box-shadow:0 24px 60px -30px rgba(0,0,0,0.5);}
+.auth-illustration{flex:1.1;background:var(--ink);color:var(--paper);padding:52px 44px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden;}
+.auth-illustration::before{content:'';position:absolute;inset:0;background-image:repeating-linear-gradient(180deg, transparent 0 32px, rgba(246,243,234,0.07) 32px 33px);}
+.auth-illustration .mark{font-size:14px;position:relative;display:flex;align-items:center;gap:9px;color:rgba(246,243,234,0.85);}
+.auth-illustration h2{font-size:32px;font-weight:600;line-height:1.2;position:relative;margin:0 0 12px;font-family:'Fraunces',serif;}
+.auth-illustration p{color:rgba(246,243,234,0.55);font-size:14px;position:relative;max-width:270px;margin:0;}
+.auth-card{flex:1;max-width:none;border:none;display:flex;flex-direction:column;justify-content:center;background:var(--panel);}
+@media(max-width:720px){.auth-shell{flex-direction:column;min-height:auto;}.auth-illustration{padding:34px 30px;}}
+
+/* ---- Today stat + category select + to-do ---- */
+.mini-stats .val.today{color:var(--red);}
+.todo-row{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.todo-row input[type=text]{flex:2;min-width:160px;}
+.todo-row select{flex:1;min-width:110px;}
+.todo-list{list-style:none;margin:0;padding:0;}
+.todo-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
+.todo-item:last-child{border-bottom:none;}
+.todo-item input[type=checkbox]{width:17px;height:17px;accent-color:var(--green);cursor:pointer;flex-shrink:0;}
+.todo-item .ttext{flex:1;font-size:14px;}
+.todo-item.done .ttext{text-decoration:line-through;color:var(--sage);}
+.pri{font-size:11px;padding:2px 9px;border:1px solid;flex-shrink:0;}
+.pri-high{color:var(--red);border-color:var(--red);}
+.pri-medium{color:var(--gold);border-color:var(--gold);}
+.pri-low{color:var(--green);border-color:var(--green);}
+.todo-item .icon-btn{flex-shrink:0;}
+.cat-select-wrap{display:flex;gap:8px;}
+.cat-select-wrap select{flex:1;}
+</style>
+</head>
+<body>
+
+<div id="auth">
+  <div class="auth-shell">
+    <div class="auth-illustration">
+      <div class="mark"><svg width="20" height="20" viewBox="0 0 20 20"><rect x="1" y="1" width="18" height="18" fill="none" stroke="#C79A3E" stroke-width="1.4"/><line x1="4" y1="6" x2="16" y2="6" stroke="#C79A3E" stroke-width="1"/><line x1="4" y1="10" x2="16" y2="10" stroke="#C79A3E" stroke-width="1"/><line x1="4" y1="14" x2="11" y2="14" stroke="#C79A3E" stroke-width="1"/></svg>Ledger</div>
+      <div>
+        <h2>บันทึกทุกบาท<br>อย่างเป็นระบบ</h2>
+        <p>ติดตามรายรับ-รายจ่าย เห็นแนวโน้มรายเดือน และรู้ยอดคงเหลือของคุณได้ทุกเมื่อ</p>
+      </div>
+      <div class="mark" style="opacity:.6;font-size:12px;">ข้อมูลถูกเก็บไว้ในเบราว์เซอร์นี้เท่านั้น</div>
+    </div>
+    <div class="auth-card">
+      <h1 id="authTitle">เข้าสู่ระบบ</h1>
+      <p class="sub" id="authSub">สมุดบัญชีรายรับ-รายจ่ายของคุณ</p>
+      <div class="field"><label for="uname">ชื่อผู้ใช้</label><input id="uname" autocomplete="username"></div>
+      <div class="field"><label for="upass">รหัสผ่าน</label><input id="upass" type="password" autocomplete="current-password"></div>
+      <button class="btn" id="authSubmit" style="width:100%">เข้าสู่ระบบ</button>
+      <p class="err" id="authErr"></p>
+      <p class="switch-line" id="switchLine">ยังไม่มีบัญชี? <a id="switchLink">สมัครสมาชิก</a></p>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="wrap">
+    <header class="top">
+      <div class="brand"><svg width="20" height="20" viewBox="0 0 20 20"><rect x="1" y="1" width="18" height="18" fill="none" stroke="#C79A3E" stroke-width="1.4"/><line x1="4" y1="6" x2="16" y2="6" stroke="#C79A3E" stroke-width="1"/><line x1="4" y1="10" x2="16" y2="10" stroke="#C79A3E" stroke-width="1"/><line x1="4" y1="14" x2="11" y2="14" stroke="#C79A3E" stroke-width="1"/></svg><h1>Ledger</h1></div>
+      <div class="who"><span id="whoName"></span><a id="logoutBtn">ออกจากระบบ</a></div>
+    </header>
+
+    <div class="hero hero-card">
+      <div>
+        <span class="asof" id="asOfTag"></span>
+        <div class="balance-label">คงเหลือสุทธิ</div>
+        <div class="balance num" id="balanceOut">฿0</div>
+      </div>
+      <div class="mini-stats">
+        <div><span class="lbl">รายรับรวม</span><span class="val num" id="totalIncOut" style="color:var(--green)">฿0</span></div>
+        <div><span class="lbl">รายจ่ายรวม</span><span class="val num" id="totalExpOut" style="color:var(--red)">฿0</span></div>
+        <div><span class="lbl">รายจ่ายวันนี้</span><span class="val num today" id="todayExpOut">฿0</span></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h2 id="formTitle">เพิ่มรายการ</h2>
+        <div class="toggle-type">
+          <button type="button" class="active inc" id="typeIncBtn">รายรับ</button>
+          <button type="button" class="exp" id="typeExpBtn">รายจ่าย</button>
+        </div>
+        <div class="formgrid">
+          <div class="field full"><label>จำนวนเงิน</label><input id="fAmount" type="number" step="0.01" placeholder="0.00"></div>
+          <div class="field"><label>หมวดหมู่</label>
+            <div class="cat-select-wrap">
+              <select id="fCategory"></select>
+              <input id="fCategoryOther" placeholder="ระบุหมวดหมู่" style="display:none;">
+            </div>
+          </div>
+          <div class="field"><label>วันที่</label><input id="fDate" type="date"></div>
+          <div class="field full"><label>รายละเอียด (ถ้ามี)</label><input id="fNote" placeholder="โน้ตสั้นๆ"></div>
+        </div>
+        <input type="hidden" id="fEditId">
+        <button class="btn" id="fSubmit" style="width:100%;margin-top:6px;">บันทึกรายการ</button>
+        <button class="btn ghost" id="fCancel" style="width:100%;margin-top:8px;display:none;">ยกเลิกการแก้ไข</button>
+      </div>
+      <div class="panel">
+        <h2>สัดส่วนรายจ่าย</h2>
+        <div class="chart-box"><canvas id="pieChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:32px;">
+      <h2>เปรียบเทียบรายเดือน</h2>
+      <div class="chart-box"><canvas id="barChart"></canvas></div>
+    </div>
+
+    <div class="panel">
+      <h2>รายการทั้งหมด</h2>
+      <div class="filters">
+        <div class="field"><label>จากวันที่</label><input type="date" id="filterFrom"></div>
+        <div class="field"><label>ถึงวันที่</label><input type="date" id="filterTo"></div>
+        <div class="field"><label>หมวดหมู่</label><select id="filterCat"><option value="">ทั้งหมด</option></select></div>
+        <div class="field"><label>ประเภท</label><select id="filterType"><option value="">ทั้งหมด</option><option value="income">รายรับ</option><option value="expense">รายจ่าย</option></select></div>
+        <button class="btn ghost" id="filterClear">ล้างตัวกรอง</button>
+      </div>
+      <div class="overflow-x">
+        <table id="txTable">
+          <thead><tr><th>วันที่</th><th>หมวดหมู่</th><th>รายละเอียด</th><th style="text-align:right">จำนวนเงิน</th><th></th></tr></thead>
+          <tbody id="txBody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptyMsg" style="display:none;">ยังไม่มีรายการ — เริ่มเพิ่มรายการแรกของคุณด้านบน</div>
+    </div>
+
+    <div class="panel" style="margin-top:28px;">
+      <h2>สิ่งที่ต้องทำ</h2>
+      <div class="todo-row">
+        <input type="text" id="todoText" placeholder="เช่น จ่ายค่าบัตรเครดิตก่อนวันที่ 5">
+        <select id="todoPriority">
+          <option value="high">สำคัญมาก</option>
+          <option value="medium" selected>สำคัญปานกลาง</option>
+          <option value="low">สำคัญน้อย</option>
+        </select>
+        <button class="btn" id="todoAddBtn">เพิ่ม</button>
+      </div>
+      <ul class="todo-list" id="todoList"></ul>
+      <div class="empty" id="todoEmptyMsg" style="display:none;">ไม่มีสิ่งที่ต้องทำตอนนี้</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var LS = window.localStorage;
+  function safeGet(k,d){ try{ var v = LS.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } }
+  function safeSet(k,v){ try{ LS.setItem(k, JSON.stringify(v)); }catch(e){} }
+
+  var users = safeGet('pfd_users', {});
+  var currentUser = safeGet('pfd_current', null);
+  var isRegisterMode = false;
+  var editType = 'income';
+
+  var authTitle=document.getElementById('authTitle'), authSub=document.getElementById('authSub'),
+      authSubmit=document.getElementById('authSubmit'), switchLine=document.getElementById('switchLine'),
+      switchLink=document.getElementById('switchLink'), authErr=document.getElementById('authErr'),
+      unameEl=document.getElementById('uname'), upassEl=document.getElementById('upass');
+
+  function renderAuthMode(){
+    authErr.textContent='';
+    if(isRegisterMode){
+      authTitle.textContent='สมัครสมาชิก';
+      authSub.textContent='สร้างบัญชีเพื่อเริ่มบันทึกการเงินของคุณ';
+      authSubmit.textContent='สมัครสมาชิก';
+      switchLine.innerHTML='มีบัญชีอยู่แล้ว? <a id="switchLink">เข้าสู่ระบบ</a>';
+    } else {
+      authTitle.textContent='เข้าสู่ระบบ';
+      authSub.textContent='สมุดบัญชีรายรับ-รายจ่ายของคุณ';
+      authSubmit.textContent='เข้าสู่ระบบ';
+      switchLine.innerHTML='ยังไม่มีบัญชี? <a id="switchLink">สมัครสมาชิก</a>';
+    }
+    document.getElementById('switchLink').addEventListener('click', function(){ isRegisterMode=!isRegisterMode; renderAuthMode(); });
+  }
+  renderAuthMode();
+
+  authSubmit.addEventListener('click', function(){
+    var u = unameEl.value.trim(), p = upassEl.value;
+    if(!u || !p){ authErr.textContent='กรอกชื่อผู้ใช้และรหัสผ่านให้ครบ'; return; }
+    if(isRegisterMode){
+      if(users[u]){ authErr.textContent='มีชื่อผู้ใช้นี้แล้ว'; return; }
+      users[u] = { pass: p };
+      safeSet('pfd_users', users);
+      login(u);
+    } else {
+      if(!users[u] || users[u].pass !== p){ authErr.textContent='ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'; return; }
+      login(u);
+    }
+  });
+
+  function login(u){
+    currentUser = u;
+    safeSet('pfd_current', u);
+    document.getElementById('auth').style.display='none';
+    var appEl = document.getElementById('app');
+    appEl.style.display='block';
+    appEl.classList.remove('show'); void appEl.offsetWidth; appEl.classList.add('show');
+    document.getElementById('whoName').textContent = u;
+    var months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+    var today = new Date();
+    document.getElementById('asOfTag').textContent = 'ยอด ณ ' + today.getDate() + ' ' + months[today.getMonth()] + ' ' + (today.getFullYear()+543);
+    loadTx();
+    renderAll();
+    loadTodos();
+    renderTodos();
+  }
+  document.getElementById('logoutBtn').addEventListener('click', function(){
+    currentUser=null; safeSet('pfd_current', null);
+    document.getElementById('app').style.display='none';
+    document.getElementById('auth').style.display='flex';
+    unameEl.value=''; upassEl.value='';
+  });
+
+  // ---- Transactions ----
+  var tx = [];
+  function txKey(){ return 'pfd_tx_' + currentUser; }
+  function loadTx(){ tx = safeGet(txKey(), []); }
+  function saveTx(){ safeSet(txKey(), tx); }
+
+  var CATS = {
+    income: ['เงินเดือน','โบนัส','รายได้พิเศษ','ของขวัญ','อื่นๆ'],
+    expense: ['อาหาร','เดินทาง','ที่พัก','บันเทิง','ช้อปปิ้ง','สุขภาพ','บิล/ค่าใช้จ่ายประจำ','อื่นๆ']
+  };
+  var fCategory = document.getElementById('fCategory'), fCategoryOther = document.getElementById('fCategoryOther');
+  function populateCategorySelect(type, preset){
+    var list = CATS[type];
+    fCategory.innerHTML = list.map(function(c){ return '<option value="'+c+'">'+c+'</option>'; }).join('');
+    if(preset && list.indexOf(preset)===-1){
+      fCategory.value = 'อื่นๆ';
+      fCategoryOther.style.display='block';
+      fCategoryOther.value = preset;
+    } else if(preset){
+      fCategory.value = preset;
+      fCategoryOther.style.display='none';
+    } else {
+      fCategoryOther.style.display='none'; fCategoryOther.value='';
+    }
+  }
+  fCategory.addEventListener('change', function(){
+    fCategoryOther.style.display = (fCategory.value==='อื่นๆ') ? 'block' : 'none';
+  });
+  populateCategorySelect('income');
+
+  var typeIncBtn=document.getElementById('typeIncBtn'), typeExpBtn=document.getElementById('typeExpBtn');
+  typeIncBtn.addEventListener('click', function(){ editType='income'; typeIncBtn.classList.add('active'); typeExpBtn.classList.remove('active'); populateCategorySelect('income'); });
+  typeExpBtn.addEventListener('click', function(){ editType='expense'; typeExpBtn.classList.add('active'); typeIncBtn.classList.remove('active'); populateCategorySelect('expense'); });
+
+  document.getElementById('fSubmit').addEventListener('click', function(){
+    var amt = parseFloat(document.getElementById('fAmount').value);
+    var cat = (fCategory.value==='อื่นๆ' ? fCategoryOther.value.trim() : fCategory.value) || 'ไม่ระบุ';
+    var date = document.getElementById('fDate').value || new Date().toISOString().slice(0,10);
+    var note = document.getElementById('fNote').value.trim();
+    if(!amt || amt<=0){ return; }
+    var editId = document.getElementById('fEditId').value;
+    if(editId){
+      var item = tx.find(function(t){ return t.id===editId; });
+      if(item){ item.amount=amt; item.category=cat; item.date=date; item.note=note; item.type=editType; }
+      resetForm();
+    } else {
+      tx.push({ id: 'id'+Date.now()+Math.random().toString(36).slice(2,6), type: editType, amount: amt, category: cat, date: date, note: note });
+    }
+    saveTx();
+    document.getElementById('fAmount').value=''; document.getElementById('fNote').value='';
+    populateCategorySelect(editType);
+    renderAll();
+  });
+  document.getElementById('fCancel').addEventListener('click', resetForm);
+  function resetForm(){
+    document.getElementById('fEditId').value='';
+    document.getElementById('formTitle').textContent='เพิ่มรายการ';
+    document.getElementById('fSubmit').textContent='บันทึกรายการ';
+    document.getElementById('fCancel').style.display='none';
+    populateCategorySelect(editType);
+  }
+
+  function editTx(id){
+    var item = tx.find(function(t){ return t.id===id; });
+    if(!item) return;
+    document.getElementById('fEditId').value=id;
+    document.getElementById('fAmount').value=item.amount;
+    document.getElementById('fDate').value=item.date;
+    document.getElementById('fNote').value=item.note||'';
+    editType=item.type;
+    if(editType==='income'){ typeIncBtn.classList.add('active'); typeExpBtn.classList.remove('active'); }
+    else { typeExpBtn.classList.add('active'); typeIncBtn.classList.remove('active'); }
+    populateCategorySelect(editType, item.category);
+    document.getElementById('formTitle').textContent='แก้ไขรายการ';
+    document.getElementById('fSubmit').textContent='บันทึกการแก้ไข';
+    document.getElementById('fCancel').style.display='block';
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  function deleteTx(id){
+    tx = tx.filter(function(t){ return t.id!==id; });
+    saveTx(); renderAll();
+  }
+
+  // ---- Filters ----
+  var filterFrom=document.getElementById('filterFrom'), filterTo=document.getElementById('filterTo'),
+      filterCat=document.getElementById('filterCat'), filterType=document.getElementById('filterType');
+  [filterFrom,filterTo,filterCat,filterType].forEach(function(el){ el.addEventListener('change', renderAll); });
+  document.getElementById('filterClear').addEventListener('click', function(){
+    filterFrom.value=''; filterTo.value=''; filterCat.value=''; filterType.value=''; renderAll();
+  });
+
+  function getFiltered(){
+    return tx.filter(function(t){
+      if(filterFrom.value && t.date < filterFrom.value) return false;
+      if(filterTo.value && t.date > filterTo.value) return false;
+      if(filterCat.value && t.category !== filterCat.value) return false;
+      if(filterType.value && t.type !== filterType.value) return false;
+      return true;
+    });
+  }
+
+  function fmt(n){ return '฿' + n.toLocaleString('th-TH', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+  var pieChart, barChart;
+  function renderAll(){
+    // category options
+    var cats = Array.from(new Set(tx.map(function(t){ return t.category; }))).sort();
+    var curCat = filterCat.value;
+    filterCat.innerHTML = '<option value="">ทั้งหมด</option>' + cats.map(function(c){ return '<option value="'+c+'"'+(c===curCat?' selected':'')+'>'+c+'</option>'; }).join('');
+
+    var filtered = getFiltered();
+    var totalInc=0, totalExp=0;
+    filtered.forEach(function(t){ if(t.type==='income') totalInc+=t.amount; else totalExp+=t.amount; });
+    var bal = totalInc-totalExp;
+    document.getElementById('totalIncOut').textContent = fmt(totalInc);
+    document.getElementById('totalExpOut').textContent = fmt(totalExp);
+    var todayStr = new Date().toISOString().slice(0,10);
+    var todayExp = tx.filter(function(t){ return t.type==='expense' && t.date===todayStr; }).reduce(function(s,t){ return s+t.amount; }, 0);
+    document.getElementById('todayExpOut').textContent = fmt(todayExp);
+    var balEl = document.getElementById('balanceOut');
+    balEl.textContent = fmt(bal);
+    balEl.className = 'balance num ' + (bal<0?'neg':'pos');
+
+    // table
+    var body = document.getElementById('txBody');
+    var sorted = filtered.slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+    if(sorted.length===0){
+      body.innerHTML=''; document.getElementById('emptyMsg').style.display='block';
+    } else {
+      document.getElementById('emptyMsg').style.display='none';
+      body.innerHTML = sorted.map(function(t){
+        return '<tr><td>'+t.date+'</td><td><span class="cat-tag">'+t.category+'</span></td><td>'+(t.note||'—')+'</td>'+
+          '<td class="amt '+(t.type==='income'?'inc':'exp')+'">'+(t.type==='income'?'+':'-')+fmt(t.amount).replace('฿','฿')+'</td>'+
+          '<td><div class="row-actions"><button class="icon-btn" data-edit="'+t.id+'">แก้ไข</button><button class="icon-btn" data-del="'+t.id+'" style="color:var(--red)">ลบ</button></div></td></tr>';
+      }).join('');
+      Array.prototype.forEach.call(body.querySelectorAll('[data-edit]'), function(b){ b.addEventListener('click', function(){ editTx(b.getAttribute('data-edit')); }); });
+      Array.prototype.forEach.call(body.querySelectorAll('[data-del]'), function(b){ b.addEventListener('click', function(){ deleteTx(b.getAttribute('data-del')); }); });
+    }
+
+    if(typeof Chart === 'undefined'){
+      ['pieChart','barChart'].forEach(function(id){
+        var box = document.getElementById(id).parentElement;
+        box.innerHTML = '<div class="empty">โหลดไลบรารีกราฟไม่สำเร็จ ลองรีเฟรชหน้านี้อีกครั้ง</div>';
+      });
+      return;
+    }
+
+    // pie: expense by category (from filtered set)
+    try{
+      var expByCat = {};
+      filtered.forEach(function(t){ if(t.type==='expense'){ expByCat[t.category]=(expByCat[t.category]||0)+t.amount; } });
+      var pieLabels = Object.keys(expByCat), pieData = pieLabels.map(function(k){ return expByCat[k]; });
+      var palette = ['#B84A3E','#2F6F5E','#C79A3E','#7C8F89','#8B5E3C','#5B7DB1','#9A6FA6'];
+      var pieCanvas = document.getElementById('pieChart');
+      var existingPie = Chart.getChart ? Chart.getChart(pieCanvas) : null;
+      if(existingPie) existingPie.destroy();
+      if(pieChart) pieChart.destroy();
+      var ctxP = pieCanvas.getContext('2d');
+      pieChart = new Chart(ctxP, {
+        type:'doughnut',
+        data:{ labels: pieLabels.length?pieLabels:['ยังไม่มีรายจ่าย'], datasets:[{ data: pieLabels.length?pieData:[1], backgroundColor: pieLabels.length?palette:['#7C8F89'], borderWidth:0 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ color: getComputedStyle(document.body).color, font:{family:'Inter'}, boxWidth:12, padding:12 } } } }
+      });
+    }catch(e){ console.error('pie chart error', e); }
+
+    // bar: monthly income vs expense (last 6 months present in data, from full tx not just filtered)
+    try{
+      var monthMap = {};
+      tx.forEach(function(t){
+        var m = t.date.slice(0,7);
+        if(!monthMap[m]) monthMap[m] = {inc:0, exp:0};
+        monthMap[m][t.type==='income'?'inc':'exp'] += t.amount;
+      });
+      var months = Object.keys(monthMap).sort().slice(-6);
+      var barCanvas = document.getElementById('barChart');
+      var existingBar = Chart.getChart ? Chart.getChart(barCanvas) : null;
+      if(existingBar) existingBar.destroy();
+      if(barChart) barChart.destroy();
+      var ctxB = barCanvas.getContext('2d');
+      var axisColor = getComputedStyle(document.body).color;
+      barChart = new Chart(ctxB, {
+        type:'bar',
+        data:{ labels: months.length?months:['ไม่มีข้อมูล'],
+          datasets:[
+            { label:'รายรับ', data: months.length?months.map(function(m){ return monthMap[m].inc; }):[0], backgroundColor:'#2F6F5E' },
+            { label:'รายจ่าย', data: months.length?months.map(function(m){ return monthMap[m].exp; }):[0], backgroundColor:'#B84A3E' }
+          ]
+        },
+        options:{ responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{ position:'bottom', labels:{ color: axisColor, font:{family:'Inter'} } } },
+          scales:{ x:{ ticks:{ color: axisColor }, grid:{ display:false } }, y:{ ticks:{ color: axisColor }, grid:{ color:'rgba(127,127,127,0.15)' } } }
+        }
+      });
+    }catch(e){ console.error('bar chart error', e); }
+  }
+
+  // ---- Smart To-Do List ----
+  var todos = [];
+  function todoKey(){ return 'pfd_todo_' + currentUser; }
+  function loadTodos(){ todos = safeGet(todoKey(), []); }
+  function saveTodos(){ safeSet(todoKey(), todos); }
+  var priWeight = { high:0, medium:1, low:2 };
+  var priLabel = { high:'สำคัญมาก', medium:'สำคัญปานกลาง', low:'สำคัญน้อย' };
+
+  document.getElementById('todoAddBtn').addEventListener('click', function(){
+    var text = document.getElementById('todoText').value.trim();
+    var pri = document.getElementById('todoPriority').value;
+    if(!text) return;
+    todos.push({ id:'t'+Date.now()+Math.random().toString(36).slice(2,6), text:text, priority:pri, done:false });
+    saveTodos();
+    document.getElementById('todoText').value='';
+    renderTodos();
+  });
+  document.getElementById('todoText').addEventListener('keydown', function(e){ if(e.key==='Enter') document.getElementById('todoAddBtn').click(); });
+
+  function toggleTodo(id){ var item = todos.find(function(t){ return t.id===id; }); if(item) item.done=!item.done; saveTodos(); renderTodos(); }
+  function deleteTodo(id){ todos = todos.filter(function(t){ return t.id!==id; }); saveTodos(); renderTodos(); }
+  function escapeHtml(s){ return s.replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  function renderTodos(){
+    var list = document.getElementById('todoList');
+    if(todos.length===0){ list.innerHTML=''; document.getElementById('todoEmptyMsg').style.display='block'; return; }
+    document.getElementById('todoEmptyMsg').style.display='none';
+    var sorted = todos.slice().sort(function(a,b){
+      if(a.done!==b.done) return a.done?1:-1;
+      return priWeight[a.priority]-priWeight[b.priority];
+    });
+    list.innerHTML = sorted.map(function(t){
+      return '<li class="todo-item'+(t.done?' done':'')+'"><input type="checkbox" '+(t.done?'checked':'')+' data-toggle="'+t.id+'"><span class="ttext">'+escapeHtml(t.text)+'</span><span class="pri pri-'+t.priority+'">'+priLabel[t.priority]+'</span><button class="icon-btn" data-deltodo="'+t.id+'" style="color:var(--red)">ลบ</button></li>';
+    }).join('');
+    Array.prototype.forEach.call(list.querySelectorAll('[data-toggle]'), function(cb){ cb.addEventListener('change', function(){ toggleTodo(cb.getAttribute('data-toggle')); }); });
+    Array.prototype.forEach.call(list.querySelectorAll('[data-deltodo]'), function(b){ b.addEventListener('click', function(){ deleteTodo(b.getAttribute('data-deltodo')); }); });
+  }
+  document.getElementById('fDate').value = new Date().toISOString().slice(0,10);
+
+  if(currentUser && users[currentUser]){ login(currentUser); }
+})();
+</script>
+</body>
+</html>
